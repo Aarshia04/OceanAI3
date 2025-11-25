@@ -1,13 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import projectService, { ProjectPayload } from '../services/projectService';
+import projectService, { DocumentConfigPayload, Project, ProjectPayload } from '../services/projectService';
 import { useAuth } from '../context/AuthContext';
-
-interface Project {
-  id: number;
-  title: string;
-  document_type: string;
-}
 
 function ProjectsPage() {
   const navigate = useNavigate();
@@ -15,8 +9,10 @@ function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [documentType, setDocumentType] = useState<ProjectPayload['document_type']>('.docx');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [docTitle, setDocTitle] = useState('');
+  const [documentType, setDocumentType] = useState<DocumentConfigPayload['doc_type']>('.docx');
   const [creating, setCreating] = useState(false);
 
   const fetchProjects = async () => {
@@ -26,6 +22,10 @@ function ProjectsPage() {
       const data = await projectService.list();
       setProjects(data);
     } catch (err: any) {
+      if (err?.response?.status === 401) {
+        handleLogout();
+        return;
+      }
       const message = err?.response?.data?.detail || 'Unable to load projects.';
       setError(message);
     } finally {
@@ -39,15 +39,25 @@ function ProjectsPage() {
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
-    if (!title) return;
+    if (!name) return;
 
     setCreating(true);
     setError(null);
     try {
-      await projectService.create({ title, document_type: documentType });
-      setTitle('');
+      await projectService.create({
+        name,
+        description: description || undefined,
+        document_config: { doc_type: documentType, title: docTitle || undefined },
+      });
+      setName('');
+      setDescription('');
+      setDocTitle('');
       await fetchProjects();
     } catch (err: any) {
+      if (err?.response?.status === 401) {
+        handleLogout();
+        return;
+      }
       const message = err?.response?.data?.detail || 'Could not create project.';
       setError(message);
     } finally {
@@ -76,20 +86,37 @@ function ProjectsPage() {
         <div className="card">
           <h2>Create Project</h2>
           <form className="form" onSubmit={handleCreate}>
-            <label htmlFor="title">Title</label>
+            <label htmlFor="name">Project Name</label>
             <input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               placeholder="Quarterly Report"
               required
+            />
+
+            <label htmlFor="description">Description</label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional summary"
+              rows={2}
+            />
+
+            <label htmlFor="docTitle">Document Title</label>
+            <input
+              id="docTitle"
+              value={docTitle}
+              onChange={(e) => setDocTitle(e.target.value)}
+              placeholder="Title for generated document"
             />
 
             <label htmlFor="documentType">Document type</label>
             <select
               id="documentType"
               value={documentType}
-              onChange={(e) => setDocumentType(e.target.value as ProjectPayload['document_type'])}
+              onChange={(e) => setDocumentType(e.target.value as DocumentConfigPayload['doc_type'])}
             >
               <option value=".docx">.docx</option>
               <option value=".pptx">.pptx</option>
@@ -120,8 +147,11 @@ function ProjectsPage() {
               {projects.map((project) => (
                 <li key={project.id} className="project-item">
                   <div>
-                    <p className="project-title">{project.title}</p>
-                    <p className="muted small">{project.document_type}</p>
+                    <p className="project-title">{project.name}</p>
+                    <p className="muted small">
+                      {project.document_config?.doc_type || 'N/A'}
+                      {project.description ? ` • ${project.description}` : ''}
+                    </p>
                   </div>
                 </li>
               ))}
