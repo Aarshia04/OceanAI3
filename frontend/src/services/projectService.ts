@@ -1,8 +1,22 @@
 import api from './api';
 
+export interface DocumentConfigPayload {
+  doc_type: '.docx' | '.pptx';
+  title?: string;
+  metadata?: Record<string, any>;
+}
+
 export interface ProjectPayload {
-  title: string;
-  document_type: '.docx' | '.pptx';
+  name: string;
+  description?: string;
+  document_config: DocumentConfigPayload;
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  description?: string | null;
+  document_config?: DocumentConfigPayload;
 }
 
 const projectService = {
